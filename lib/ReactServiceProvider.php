@@ -42,13 +42,25 @@ class ReactServiceProvider extends ServiceProvider {
 
       }
       else {
-
+        $acceptedLangs = [
+          'en'
+        ];
+        $lang = 'en';
+        $requestLang = $_SERVER['HTTP_ACCEPT_LANGUAGE'];
+        $requestLangParts = explode(',', $requestLang);
         $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'react');
+        $components = config('react.components');
+
+        if (count($requestLangParts) > 1 && in_array($requestLangParts[1], $acceptedLangs)) {
+          $lang = $requestLangParts[1];
+        }
+
+        $components = sprintf($components, $lang);
 
         $reactBaseSource = file_get_contents(config('react.source'));
         $reactDomSource = file_get_contents(config('react.dom-source'));
         $reactDomServerSource = file_get_contents(config('react.dom-server-source'));
-        $componentsSource = file_get_contents(config('react.components'));
+        $componentsSource = file_get_contents($components);
         $reactSource = $reactBaseSource;
         $reactSource .= $reactDomSource;
         $reactSource .= $reactDomServerSource;
