@@ -2,7 +2,7 @@
 
 # react-laravel-fork
 
-- Adjustmnets for loading components file based on language (i18n support)
+- Adjustments for loading components file based on language (i18n support)
 - Formatted in accordance with PSR2
 
 # react-laravel
