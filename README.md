@@ -1,5 +1,10 @@
 [![Code Climate](https://codeclimate.com/github/talyssonoc/react-laravel/badges/gpa.svg)](https://codeclimate.com/github/talyssonoc/react-laravel) [![Build Status](https://travis-ci.org/talyssonoc/react-laravel.svg?branch=master)](https://travis-ci.org/talyssonoc/react-laravel)
 
+# react-laravel-fork
+
+- Adjustmnets for loading components file based on language (i18n support)
+- Formatted in accordance with PSR2
+
 # react-laravel
 
 With `react-laravel` you'll be able to use [ReactJS](https://facebook.github.io/react/) components right from your Blade views, with optional server-side rendering, and use them on the client-side with React due to unobtrusive JavaScript.

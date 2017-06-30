@@ -5,77 +5,101 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
-class ReactServiceProvider extends ServiceProvider {
+class ReactServiceProvider extends ServiceProvider
+{
+    public function boot()
+    {
+        Blade::extend(function ($view) {
+            $pattern = $this->createMatcher('react_component');
 
-  public function boot() {
+            return preg_replace($pattern, '<?php echo React::render$2; ?>', $view);
+        });
 
-    Blade::extend(function($view) {
-      $pattern = $this->createMatcher('react_component');
+        $prev = __DIR__ . '/../';
 
-      return preg_replace($pattern, '<?php echo React::render$2; ?>', $view);
-    });
+        $this->publishes([
+          $prev . 'assets'            => public_path('vendor/react-laravel'),
+          $prev . 'node_modules/react/dist' => public_path('vendor/react-laravel'),
+          $prev . 'node_modules/react-dom/dist' => public_path('vendor/react-laravel'),
+        ], 'assets');
 
-    $prev = __DIR__ . '/../';
+        $this->publishes([
+          $prev . 'config/config.php' => config_path('react.php'),
+        ], 'config');
+    }
 
-    $this->publishes([
-      $prev . 'assets'            => public_path('vendor/react-laravel'),
-      $prev . 'node_modules/react/dist' => public_path('vendor/react-laravel'),
-      $prev . 'node_modules/react-dom/dist' => public_path('vendor/react-laravel'),
-    ], 'assets');
+    public function register()
+    {
+        $this->app->bind('React', function () {
+            $lang = $this->getRequestLang();
 
-    $this->publishes([
-      $prev . 'config/config.php' => config_path('react.php'),
-    ], 'config');
-  }
+            $langReactSourceName = 'reactSource';
+            $langComponentsSourceName = "componentsSource-${lang}";
 
-  public function register() {
+            if (App::environment('production')
+                && Cache::has($langReactSourceName)
+                    && Cache::has($langComponentsSourceName)) {
+                $reactSource = Cache::get($langReactSourceName);
+                $componentsSource = Cache::get($langComponentsSourceName);
+            } else {
+                $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'react');
+                $components = config('react.components');
+                $components = sprintf($components, $lang);
 
-    $this->app->bind('React', function() {
+                $reactBaseSource = file_get_contents(config('react.source'));
+                $reactDomSource = file_get_contents(config('react.dom-source'));
+                $reactDomServerSource = file_get_contents(config('react.dom-server-source'));
+                $componentsSource = file_get_contents($components);
+                $reactSource = $reactBaseSource;
+                $reactSource .= $reactDomSource;
+                $reactSource .= $reactDomServerSource;
 
-      if(App::environment('production')
-        && Cache::has('reactSource')
-        && Cache::has('componentsSource')) {
+                if (App::environment('production')) {
+                    Cache::forever($langReactSourceName, $reactSource);
+                    Cache::forever($langComponentsSourceName, $componentsSource);
+                }
+            }
 
-        $reactSource = Cache::get('reactSource');
-        $componentsSource = Cache::get('componentsSource');
+            return new React($reactSource, $componentsSource);
+        });
+    }
 
-      }
-      else {
-        $acceptedLangs = [
-          'en'
-        ];
+    /**
+     * Get Language Code from Request
+     * @return string               Language Request Code (Defaulting to 'en')
+     */
+    private function getRequestLang()
+    {
         $lang = 'en';
-        $requestLang = $_SERVER['HTTP_ACCEPT_LANGUAGE'];
-        $requestLangParts = explode(',', $requestLang);
-        $this->mergeConfigFrom(__DIR__ . '/../config/config.php', 'react');
-        $components = config('react.components');
 
-        if (count($requestLangParts) > 1 && in_array($requestLangParts[1], $acceptedLangs)) {
-          $lang = $requestLangParts[1];
+        try {
+            $acceptedLangs = array_keys(
+                file_get_contents(base_path('resources/lang/languages.json'))
+            );
+            $requestLang = $_SERVER['HTTP_ACCEPT_LANGUAGE'];
+            $requestLangParts = explode(',', $requestLang);
+
+            if (count($requestLangParts) > 1 &&
+                in_array($requestLangParts[1], $acceptedLangs)) {
+                $lang = $requestLangParts[1];
+            }
+        } catch (\Exception $err) {
+            if (!App::environment('production')) {
+                Log::info('Unable to get lang in ReactServiceProvider');
+            }
+        } finally {
+            return $lang;
         }
+    }
 
-        $components = sprintf($components, $lang);
-
-        $reactBaseSource = file_get_contents(config('react.source'));
-        $reactDomSource = file_get_contents(config('react.dom-source'));
-        $reactDomServerSource = file_get_contents(config('react.dom-server-source'));
-        $componentsSource = file_get_contents($components);
-        $reactSource = $reactBaseSource;
-        $reactSource .= $reactDomSource;
-        $reactSource .= $reactDomServerSource;
-
-        if(App::environment('production')) {
-          Cache::forever('reactSource', $reactSource);
-          Cache::forever('componentsSource', $componentsSource);
-        }
-      }
-
-      return new React($reactSource, $componentsSource);
-    });
-  }
-
-  protected function createMatcher($function) {
-    return '/(?<!\w)(\s*)@' . $function . '(\s*\([\s\S]*?\))/';
-  }
+    /**
+     * Create a Regex for Matching the React Blade Component
+     * @return string           String Regex for Matching React Blade Component
+     */
+    protected function createMatcher($function)
+    {
+        return '/(?<!\w)(\s*)@' . $function . '(\s*\([\s\S]*?\))/';
+    }
 }

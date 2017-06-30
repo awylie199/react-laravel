@@ -2,8 +2,10 @@
 
 use Illuminate\Support\Facades\Facade;
 
-class React extends Facade {
-  protected static function getFacadeAccessor() {
-    return 'React';
-  }
+class React extends Facade
+{
+    protected static function getFacadeAccessor()
+    {
+        return 'React';
+    }
 }
